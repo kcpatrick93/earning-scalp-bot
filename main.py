@@ -514,7 +514,6 @@ def main_earnings_scan():
     print("=" * 80)
     print("✅ Channel broadcast complete!")
 
-# Railway health check endpoint (optional but recommended)
 def send_startup_message():
     """Send a message when the bot starts up"""
     uk_tz = pytz.timezone('Europe/London')
