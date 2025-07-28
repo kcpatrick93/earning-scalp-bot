@@ -424,3 +424,5 @@ if __name__ == "__main__":
     while True:
         schedule.run_pending()
         time.sleep(60)
+# For testing - remove this line later
+main_earnings_scan()
