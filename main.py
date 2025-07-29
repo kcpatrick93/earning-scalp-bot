@@ -1,421 +1,457 @@
 import requests
-import yfinance as yf
 import schedule
 import time
 import pytz
 import os
 from datetime import datetime, timedelta
+from bs4 import BeautifulSoup
+import json
+import yfinance as yf
+import openai
 
-# Get tokens from environment variables
-FINNHUB_TOKEN = os.getenv("FINNHUB_TOKEN", "d1ehal1r01qjssrk4fu0d1ehal1r01qjssrk4fug")
+# Configuration
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7626751011:AAHHWa7ItXmjaP4-icgw8Aiy6_SdvhMdVK4")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "@kp_earning_report_stockbot")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# COMPREHENSIVE LIST OF MAJOR STOCKS - NYSE + NASDAQ (Market Cap >$1B)
-MAJOR_STOCKS = {
-    # NASDAQ Mega/Large Caps
-    'AAPL', 'MSFT', 'GOOGL', 'GOOG', 'AMZN', 'NVDA', 'TSLA', 'META', 'AVGO', 'ORCL',
-    'COST', 'NFLX', 'CRM', 'AMD', 'CSCO', 'ADBE', 'TXN', 'QCOM', 'INTU', 'CMCSA',
-    'AMAT', 'INTC', 'PYPL', 'ISRG', 'BKNG', 'REGN', 'GILD', 'MU', 'ADI', 'LRCX',
-    'PANW', 'KLAC', 'SNPS', 'CDNS', 'MRVL', 'ORLY', 'ABNB', 'WDAY', 'TEAM', 'DXCM',
-    'SBUX', 'ZM', 'UBER', 'ROKU', 'DOCU', 'ZS', 'OKTA', 'SPLK', 'NDAQ', 'FAST',
-    'PCAR', 'DLTR', 'BIIB', 'IDXX', 'LULU', 'CSGP', 'VRSK', 'EXC', 'CTSH', 'FISV',
-    'ATVI', 'CHTR', 'LCID', 'RIVN', 'MRNA', 'VRTX', 'ALGN', 'SGEN', 'BMRN', 'ILMN',
-    'WBA', 'PAYX', 'CTAS', 'ODFL', 'ROST', 'KHC', 'SIRI', 'XLNX', 'MNST', 'CRWD',
+# Set OpenAI key if available
+if OPENAI_API_KEY:
+    openai.api_key = 
     
-    # NYSE Mega/Large Caps  
-    'V', 'JPM', 'WMT', 'XOM', 'UNH', 'MA', 'PG', 'HD', 'JNJ', 'BAC', 'KO', 'PEP',
-    'LLY', 'TMO', 'LIN', 'ACN', 'MRK', 'WFC', 'DIS', 'ABT', 'VZ', 'COP', 'DHR',
-    'PM', 'SPGI', 'RTX', 'HON', 'CAT', 'GS', 'NOW', 'IBM', 'AXP', 'BA', 'MMM',
-    'GE', 'T', 'MCD', 'NKE', 'CVX', 'NEE', 'LMT', 'UPS', 'LOW', 'AMGN', 'SCHW',
-    'BLK', 'SYK', 'ADP', 'TJX', 'MDLZ', 'C', 'DE', 'AMT', 'SPOT', 'PFE', 'SO',
-    'CL', 'BMY', 'TMUS', 'UNP', 'MS', 'BABA', 'FDX', 'USB', 'CVS', 'TGT', 'ABBV',
-    'MO', 'F', 'GM', 'DAL', 'AAL', 'UAL', 'LUV', 'CCL', 'RCL', 'NCLH', 'MGM',
-    'WYNN', 'LVS', 'BYD', 'CAH', 'WBA', 'RAD', 'KR', 'SYY', 'COST', 'TJX', 'DG',
-    
-    # Additional Major Companies (>$1B market cap)
-    'AZN', 'STLA', 'CBRE', 'DTE', 'SWK', 'BXP', 'NBIX', 'NMR', 'ARES', 'NXPI',
-    'GLW', 'TR', 'ARCC', 'CZR', 'INCY', 'FYBR', 'OFLX', 'JBGS', 'ASH', 'SB',
-    'IPA', 'CVEO', 'LVRO', 'AXR', 'GIC', 'DALN', 'EXE', 'ARI', 'WELL', 'UHS',
-    'CINF', 'NBTB', 'VLTO', 'EKSO', 'TLRY', 'WM', 'FSUN', 'PFG', 'CDP', 'PDM',
-    'WU', 'DM', 'BOH', 'SITC', 'RVTY', 'BSRR', 'ALRS', 'SYRS', 'RITM', 'ESQ',
-    'NBN', 'BMRC', 'CZWI', 'HEES', 'V', 'PG', 'UNH', 'MRK', 'BKNG', 'BA', 'SPOT',
-    
-    # REITs and Energy
-    'EQIX', 'PLD', 'CCI', 'AMT', 'SBAC', 'DLR', 'PSA', 'O', 'WELL', 'VTR', 'ARE',
-    'EPD', 'ET', 'KMI', 'OKE', 'WMB', 'MPLX', 'PAA', 'PAGP', 'SMLP', 'CEQP',
-    
-    # Financial Services
-    'BRK-A', 'BRK-B', 'JPM', 'BAC', 'WFC', 'C', 'GS', 'MS', 'USB', 'PNC', 'TFC',
-    'COF', 'SCHW', 'BLK', 'SPGI', 'ICE', 'CME', 'MCO', 'MSCI', 'NDAQ', 'CBOE',
-    
-    # Healthcare & Biotech
-    'JNJ', 'PFE', 'ABT', 'MRK', 'LLY', 'TMO', 'DHR', 'AMGN', 'GILD', 'BIIB',
-    'VRTX', 'REGN', 'MRNA', 'BNTX', 'ZTS', 'BMY', 'AZN', 'NVO', 'ROCHE', 'SNY',
-    
-    # Technology Services
-    'CRM', 'NOW', 'WDAY', 'TEAM', 'ZM', 'DOCU', 'ZS', 'OKTA', 'SPLK', 'SNOW',
-    'PLTR', 'U', 'PATH', 'DDOG', 'NET', 'CRWD', 'S', 'TWLO', 'WORK', 'FIVN'
-}
-
 def send_telegram_message(message):
-    """Send message with fallback attempts"""
+    """Send message to Telegram"""
     try:
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-        
-        # Try with HTML formatting
         data = {'chat_id': TELEGRAM_CHAT_ID, 'text': message, 'parse_mode': 'HTML'}
         response = requests.post(url, data=data, timeout=10)
         if response.status_code == 200:
             print("📡 Message sent!")
             return True
-            
-        # Fallback to plain text
-        data = {'chat_id': TELEGRAM_CHAT_ID, 'text': message}
-        response = requests.post(url, data=data, timeout=10)
-        if response.status_code == 200:
-            print("📡 Message sent (plain text)!")
-            return True
-            
-        print(f"❌ Message failed: {response.status_code} - {response.text}")
-        return False
-        
+        else:
+            # Fallback to plain text
+            data = {'chat_id': TELEGRAM_CHAT_ID, 'text': message}
+            response = requests.post(url, data=data, timeout=10)
+            return response.status_code == 200
     except Exception as e:
         print(f"❌ Telegram error: {e}")
         return False
 
-def get_earnings_calendar():
-    """Get earnings for major stocks only - NO API RATE LIMITS"""
-    today = datetime.now().strftime('%Y-%m-%d')
-    url = f"https://finnhub.io/api/v1/calendar/earnings?from={today}&to={today}&token={FINNHUB_TOKEN}"
-    
+def get_market_cap_and_price(symbol):
+    """Get market cap and price data using yfinance"""
     try:
-        print("🔍 Fetching earnings calendar...")
-        response = requests.get(url, timeout=15)
-        if response.status_code == 200:
-            earnings = response.json()
-            
-            print(f"📊 Raw earnings data: {len(earnings.get('earningsCalendar', []))} total")
-            
-            bmo_earnings = []
-            amc_earnings = []
-            
-            # Filter to major stocks using our curated list (NO API CALLS)
-            for stock in earnings.get('earningsCalendar', []):
-                symbol = stock.get('symbol')
-                if symbol in MAJOR_STOCKS:  # Simple lookup - no API calls!
-                    print(f"    ✅ Found major stock: {symbol}")
-                    if stock.get('hour') == 'bmo':
-                        bmo_earnings.append(stock)
-                    elif stock.get('hour') == 'amc':
-                        amc_earnings.append(stock)
-            
-            print(f"✅ Filtered to {len(bmo_earnings)} BMO + {len(amc_earnings)} AMC major stocks")
-            return bmo_earnings, amc_earnings
-        else:
-            print(f"❌ Earnings API failed: {response.status_code}")
-            return [], []
-    except Exception as e:
-        print(f"❌ Earnings API error: {e}")
-        return [], []
-
-def analyze_stock_gap(symbol):
-    """Analyze stock with rate limiting protection"""
-    try:
-        print(f"  📊 Analyzing {symbol}...")
-        stock = yf.Ticker(symbol)
+        ticker = yf.Ticker(symbol)
         
-        # Add delay to avoid rate limits
-        time.sleep(0.5)
+        # Get market cap
+        info = ticker.info
+        market_cap = info.get('marketCap', 0)
         
-        hist = stock.history(period="2d")
+        # Get price data
+        hist = ticker.history(period="2d", interval="1d")
         if len(hist) < 2:
-            print(f"    ❌ No price data for {symbol}")
+            return None, None
+            
+        previous_close = hist['Close'].iloc[-2]
+        current_price = hist['Close'].iloc[-1]
+        
+        # Try to get real-time/pre-market price
+        try:
+            current_price = info.get('regularMarketPrice', current_price)
+            premarket_price = info.get('preMarketPrice')
+            if premarket_price and premarket_price > 0:
+                current_price = premarket_price
+        except:
+            pass
+        
+        gap_percent = ((current_price - previous_close) / previous_close) * 100
+        
+        price_data = {
+            'symbol': symbol,
+            'current_price': current_price,
+            'previous_close': previous_close,
+            'gap_percent': gap_percent
+        }
+        
+        return market_cap, price_data
+    except Exception as e:
+        print(f"❌ Error getting data for {symbol}: {e}")
+        return None, None
+
+def analyze_earnings_with_llm(symbol, use_claude=False):
+    """Use LLM to analyze earnings sentiment and direction"""
+    try:
+        prompt = f"""
+        Analyze {symbol} earnings results released today (July 29, 2025).
+        
+        Research and provide:
+        1. Beat/Miss/Inline: Did they beat, miss, or meet EPS and revenue estimates?
+        2. Key highlights: Any major announcements, guidance changes, or surprises?
+        3. Sentiment: Overall positive, negative, or neutral?
+        4. Direction prediction: Should the stock go UP or DOWN based on the earnings?
+        5. Confidence: Rate your confidence 1-10 (10 = very confident)
+        
+        Format your response as:
+        RESULT: BEAT/MISS/INLINE
+        EPS: [actual vs expected]
+        REVENUE: [actual vs expected] 
+        SENTIMENT: POSITIVE/NEGATIVE/NEUTRAL
+        DIRECTION: UP/DOWN
+        CONFIDENCE: [1-10]
+        REASONING: [brief explanation]
+        
+        Be concise but thorough in your analysis.
+        """
+        
+        if use_claude and CLAUDE_API_KEY:
+            # Use Claude API (Anthropic)
+            headers = {
+                'Authorization': f'Bearer {CLAUDE_API_KEY}',
+                'Content-Type': 'application/json'
+            }
+            
+            data = {
+                "model": "claude-3-sonnet-20240229",
+                "max_tokens": 500,
+                "messages": [{"role": "user", "content": prompt}]
+            }
+            
+            response = requests.post(
+                "https://api.anthropic.com/v1/messages",
+                headers=headers,
+                json=data,
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                return response.json()['content'][0]['text']
+            else:
+                print(f"❌ Claude API error: {response.status_code}")
+                return None
+                
+        elif OPENAI_API_KEY:
+            # Use OpenAI GPT
+            response = openai.ChatCompletion.create(
+                model="gpt-4o-mini",  # Much cheaper option - perfect for this task
+                messages=[
+                    {"role": "system", "content": "You are a financial analyst expert at analyzing earnings reports and predicting stock movements."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=500,
+                temperature=0.1
+            )
+            
+            return response.choices[0].message.content
+        else:
+            print("❌ No LLM API key configured")
+            return None
+            
+    except Exception as e:
+        print(f"❌ LLM analysis error for {symbol}: {e}")
+        return None
+
+def parse_llm_analysis(analysis_text):
+    """Parse the LLM response into structured data"""
+    try:
+        lines = analysis_text.strip().split('\n')
+        parsed = {}
+        
+        for line in lines:
+            line = line.strip()
+            if ':' in line:
+                key, value = line.split(':', 1)
+                key = key.strip().upper()
+                value = value.strip()
+                
+                if key == 'RESULT':
+                    parsed['result'] = value
+                elif key == 'EPS':
+                    parsed['eps'] = value
+                elif key == 'REVENUE':
+                    parsed['revenue'] = value
+                elif key == 'SENTIMENT':
+                    parsed['sentiment'] = value
+                elif key == 'DIRECTION':
+                    parsed['direction'] = value
+                elif key == 'CONFIDENCE':
+                    try:
+                        parsed['confidence'] = int(value.split()[0])  # Extract number
+                    except:
+                        parsed['confidence'] = 5
+                elif key == 'REASONING':
+                    parsed['reasoning'] = value
+        
+        return parsed
+    except Exception as e:
+        print(f"❌ Error parsing LLM analysis: {e}")
+        return None
+
+def scrape_nasdaq_bmo_earnings():
+    """Get BMO (Before Market Open) earnings for today"""
+    try:
+        print("🔍 Getting today's BMO earnings...")
+        
+        # Try multiple sources
+        today = datetime.now().strftime('%Y-%m-%d')
+        
+        # Method 1: Try NASDAQ earnings page
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        
+        # For now, use known BMO stocks from today + major earnings calendars
+        # In production, you'd want to scrape multiple sources
+        
+        known_bmo_today = [
+            'PG', 'UNH', 'MRK', 'BA', 'SPOT', 'AMT', 'RCL', 'ECL', 'UPS', 'PYPL', 'JCI',
+            'AZN', 'STZ', 'NVR', 'CMG', 'MMM', 'GD', 'NOC', 'KO'
+        ]
+        
+        print(f"✅ Found {len(known_bmo_today)} BMO earnings stocks")
+        return known_bmo_today
+        
+    except Exception as e:
+        print(f"❌ Error getting BMO earnings: {e}")
+        return ['PG', 'UNH', 'BA', 'SPOT', 'UPS']  # Fallback
+
+def analyze_earnings_opportunity(symbol):
+    """Complete earnings analysis combining LLM + price data"""
+    try:
+        print(f"🔍 Analyzing {symbol}...")
+        
+        # Get market cap and price data
+        market_cap, price_data = get_market_cap_and_price(symbol)
+        
+        if not market_cap or market_cap < 1_000_000_000:
+            print(f"❌ {symbol}: Market cap too small or unavailable")
             return None
         
-        yesterday_close = hist['Close'].iloc[-2]
-        current_price = hist['Close'].iloc[-1]
-        gap_percent = ((current_price - yesterday_close) / yesterday_close) * 100
+        if not price_data:
+            print(f"❌ {symbol}: No price data")
+            return None
         
-        # Calculate volume surge
-        recent_volume = hist['Volume'].iloc[-1]
-        avg_volume_5d = hist['Volume'].mean()
-        volume_surge = recent_volume / avg_volume_5d if avg_volume_5d > 0 else 1
+        # Get LLM earnings analysis
+        print(f"🤖 Getting LLM analysis for {symbol}...")
+        llm_analysis = analyze_earnings_with_llm(symbol)
         
-        # Get basic company info (minimal API calls)
-        try:
-            time.sleep(0.3)  # Rate limit protection
-            info = stock.info
-            company_name = info.get('shortName', symbol)
-            market_cap = info.get('marketCap', 0)
-        except:
-            company_name = symbol
-            market_cap = 0
+        if not llm_analysis:
+            print(f"❌ {symbol}: LLM analysis failed")
+            return None
         
-        print(f"    💰 {symbol} ({company_name}): ${yesterday_close:.2f} → ${current_price:.2f} ({gap_percent:+.1f}%)")
+        # Parse LLM response
+        parsed_analysis = parse_llm_analysis(llm_analysis)
+        
+        if not parsed_analysis:
+            print(f"❌ {symbol}: Failed to parse LLM response")
+            return None
+        
+        # Combine LLM sentiment with gap analysis
+        gap = price_data['gap_percent']
+        sentiment = parsed_analysis.get('sentiment', 'NEUTRAL')
+        direction = parsed_analysis.get('direction', 'UNKNOWN')
+        confidence = parsed_analysis.get('confidence', 5)
+        
+        # Calculate combined score
+        # LLM confidence + gap alignment bonus
+        base_score = confidence * 10  # 1-10 becomes 10-100
+        
+        # Bonus if gap aligns with LLM direction
+        gap_direction = "UP" if gap > 0 else "DOWN"
+        if gap_direction == direction:
+            alignment_bonus = min(20, abs(gap) * 5)  # Up to 20 point bonus
+            base_score += alignment_bonus
+        else:
+            base_score -= 10  # Penalty for misalignment
+        
+        # Gap size matters for execution
+        if abs(gap) < 0.5:
+            base_score -= 20  # Too small to trade
+        elif abs(gap) > 8:
+            base_score -= 30  # Too risky
+        
+        final_score = max(0, min(100, base_score))
+        
+        # Determine trading signal
+        if sentiment == "POSITIVE" and direction == "UP":
+            if gap > 1:
+                signal = f"🚀 STRONG BUY"
+            else:
+                signal = f"🟢 BUY"
+        elif sentiment == "NEGATIVE" and direction == "DOWN":
+            if gap < -1:
+                signal = f"📉 STRONG SHORT"
+            else:
+                signal = f"🔴 SHORT"
+        elif sentiment == "POSITIVE" and gap > 0:
+            signal = f"🟡 CAUTIOUS BUY"
+        elif sentiment == "NEGATIVE" and gap < 0:
+            signal = f"🟡 CAUTIOUS SHORT"
+        else:
+            signal = f"⚪ MIXED SIGNALS"
+            final_score -= 20
+        
+        if final_score < 40:  # Minimum threshold
+            print(f"❌ {symbol}: Score too low ({final_score})")
+            return None
+        
+        print(f"✅ {symbol}: {signal} (Score: {final_score})")
         
         return {
             'symbol': symbol,
-            'company_name': company_name,
-            'yesterday_close': yesterday_close,
-            'current_price': current_price,
-            'gap_percent': gap_percent,
-            'volume_surge': volume_surge,
-            'market_cap': market_cap
+            'signal': signal,
+            'sentiment': sentiment,
+            'direction': direction,
+            'gap': gap,
+            'price_from': price_data['previous_close'],
+            'price_to': price_data['current_price'],
+            'confidence': confidence,
+            'score': final_score,
+            'market_cap': market_cap,
+            'llm_reasoning': parsed_analysis.get('reasoning', 'No reasoning provided'),
+            'eps_info': parsed_analysis.get('eps', 'N/A'),
+            'revenue_info': parsed_analysis.get('revenue', 'N/A')
         }
+        
     except Exception as e:
-        print(f"    ❌ Error analyzing {symbol}: {e}")
+        print(f"❌ Error analyzing {symbol}: {e}")
         return None
 
-def get_earnings_results(symbol):
-    """Get earnings surprise data"""
-    try:
-        url = f"https://finnhub.io/api/v1/stock/earnings?symbol={symbol}&token={FINNHUB_TOKEN}"
-        response = requests.get(url, timeout=10)
-        if response.status_code == 200:
-            earnings_data = response.json()
-            if earnings_data and len(earnings_data) > 0:
-                latest = earnings_data[0]
-                actual_eps = latest.get('actual')
-                estimate_eps = latest.get('estimate')
-                if actual_eps is not None and estimate_eps is not None:
-                    return {
-                        'actual_eps': actual_eps,
-                        'estimate_eps': estimate_eps,
-                        'eps_surprise': actual_eps - estimate_eps
-                    }
-    except Exception as e:
-        pass
-    return None
-
-def calculate_opportunity_score(stock_data, earnings_data, earnings_type):
-    """Calculate opportunity score"""
-    score = 0
-    gap = abs(stock_data['gap_percent'])
-    
-    # Base score from gap size
-    if 2 <= gap <= 6:
-        score += 100
-    elif 1.5 <= gap < 2 or 6 < gap <= 8:
-        score += 80
-    elif 1 <= gap < 1.5 or 8 < gap <= 10:
-        score += 60
-    else:
-        score += 20
-    
-    # Earnings surprise bonus
-    if earnings_data:
-        eps_surprise = earnings_data.get('eps_surprise', 0)
-        if eps_surprise > 0:
-            score += 50  # Beat earnings
-        elif eps_surprise < -0.05:
-            score += 30  # Significant miss
-    
-    # Volume surge bonus
-    volume_surge = stock_data.get('volume_surge', 1)
-    if volume_surge > 2:
-        score += 30
-    elif volume_surge > 1.5:
-        score += 20
-    elif volume_surge > 1.2:
-        score += 10
-    
-    # Market cap factor
-    market_cap = stock_data.get('market_cap', 0)
-    if market_cap > 50000000000:  # >$50B
-        score += 20
-    elif market_cap > 10000000000:  # >$10B
-        score += 15
-    elif market_cap > 5000000000:   # >$5B
-        score += 10
-    
-    # AMC penalty
-    if earnings_type == 'AMC':
-        score -= 10
-    
-    return score
-
-def generate_signal(stock_data, earnings_data, earnings_type):
-    """Generate trading signal"""
-    gap = stock_data['gap_percent']
-    
-    # Must have meaningful gap
-    if abs(gap) < 1.0:
-        return None
-    
-    # Skip extremely volatile gaps
-    if abs(gap) > 12:
-        return None
-    
-    # Generate signal
-    if earnings_data:
-        eps_surprise = earnings_data.get('eps_surprise', 0)
-        if eps_surprise > 0 and gap > 0:
-            return f"🚀 STRONG BUY - Beat + {gap:.1f}% gap [{earnings_type}]"
-        elif eps_surprise < 0 and gap < 0:
-            return f"📉 STRONG SHORT - Miss + {gap:.1f}% gap [{earnings_type}]"
-        elif eps_surprise > 0 and gap < 0:
-            return f"🤔 CONTRARIAN - Beat but {gap:.1f}% down [{earnings_type}]"
-        elif eps_surprise < 0 and gap > 0:
-            return f"⚠️ RISKY - Miss but {gap:.1f}% up [{earnings_type}]"
-    
-    # Gap-only signal
-    direction = "BUY" if gap > 0 else "SHORT"
-    return f"🟡 {direction} - {gap:.1f}% gap [{earnings_type}]"
-
-def main_earnings_scan():
-    print("🚨 SMART EARNINGS SCAN - TOP 5 RECOMMENDATIONS 🚨")
+def main_llm_earnings_scan():
+    """Main LLM-powered earnings scan"""
+    print("🤖 LLM EARNINGS ANALYSIS SCAN 🤖")
     print("=" * 60)
     
-    bmo_earnings, amc_earnings = get_earnings_calendar()
-    total_earnings = len(bmo_earnings) + len(amc_earnings)
+    uk_tz = pytz.timezone('Europe/London')
+    current_time = datetime.now(uk_tz)
     
-    if total_earnings == 0:
-        msg = "📭 No major earnings today"
+    print(f"📅 Scan time: {current_time.strftime('%A, %B %d at %H:%M UK')}")
+    print(f"🤖 Using AI to analyze earnings sentiment")
+    print(f"🎯 Target: >$1B market cap, BMO earnings")
+    print(f"⏰ Entry: Market open (2:30 PM UK)")
+    print(f"💰 Target: 3-5% profit | Stop: 2% loss")
+    
+    # Check API keys
+    if not OPENAI_API_KEY and not CLAUDE_API_KEY:
+        print("❌ No LLM API key configured!")
+        print("Set OPENAI_API_KEY or CLAUDE_API_KEY environment variable")
+        return
+    
+    # Get BMO earnings
+    bmo_stocks = scrape_nasdaq_bmo_earnings()
+    
+    if not bmo_stocks:
+        msg = "📭 No BMO earnings data available today"
         print(msg)
         send_telegram_message(msg)
         return
     
-    print(f"📊 Analyzing {total_earnings} major stocks...")
+    print(f"📊 Analyzing {len(bmo_stocks)} BMO stocks with AI...")
+    print("-" * 60)
     
-    all_opportunities = []
+    opportunities = []
+    processed = 0
     
-    # Process BMO earnings
-    for earnings_item in bmo_earnings:
-        symbol = earnings_item.get('symbol')
-        print(f"[BMO] {symbol}")
+    # Analyze each stock with LLM
+    for symbol in bmo_stocks:
+        opportunity = analyze_earnings_opportunity(symbol)
+        if opportunity:
+            opportunities.append(opportunity)
         
-        stock_data = analyze_stock_gap(symbol)
-        if not stock_data:
-            continue
+        processed += 1
+        print(f"Progress: {processed}/{len(bmo_stocks)}")
         
-        earnings_results = get_earnings_results(symbol)
-        signal = generate_signal(stock_data, earnings_results, 'BMO')
-        
-        if signal:
-            score = calculate_opportunity_score(stock_data, earnings_results, 'BMO')
-            all_opportunities.append({
-                'symbol': symbol,
-                'company_name': stock_data['company_name'],
-                'signal': signal,
-                'gap': stock_data['gap_percent'],
-                'price_from': stock_data['yesterday_close'],
-                'price_to': stock_data['current_price'],
-                'earnings_type': 'BMO',
-                'score': score,
-                'earnings_data': earnings_results
-            })
-            print(f"    🎯 {signal} (Score: {score})")
-        else:
-            print(f"    ❌ No signal")
-        print()
-    
-    # Process AMC earnings
-    for earnings_item in amc_earnings:
-        symbol = earnings_item.get('symbol')
-        print(f"[AMC] {symbol}")
-        
-        stock_data = analyze_stock_gap(symbol)
-        if not stock_data:
-            continue
-        
-        earnings_results = get_earnings_results(symbol)
-        signal = generate_signal(stock_data, earnings_results, 'AMC')
-        
-        if signal:
-            score = calculate_opportunity_score(stock_data, earnings_results, 'AMC')
-            all_opportunities.append({
-                'symbol': symbol,
-                'company_name': stock_data['company_name'],
-                'signal': signal,
-                'gap': stock_data['gap_percent'],
-                'price_from': stock_data['yesterday_close'],
-                'price_to': stock_data['current_price'],
-                'earnings_type': 'AMC',
-                'score': score,
-                'earnings_data': earnings_results
-            })
-            print(f"    🎯 {signal} (Score: {score})")
-        else:
-            print(f"    ❌ No signal")
-        print()
+        # Rate limiting for API calls
+        time.sleep(2)  # Be nice to APIs
     
     print("=" * 60)
     
-    # Rank and get TOP 5
-    if all_opportunities:
-        top_opportunities = sorted(all_opportunities, key=lambda x: x['score'], reverse=True)[:5]
+    if opportunities:
+        # Sort by combined score and get top 5
+        top_5 = sorted(opportunities, key=lambda x: x['score'], reverse=True)[:5]
         
-        uk_tz = pytz.timezone('Europe/London')
-        current_time = datetime.now(uk_tz)
+        # Create detailed message
+        msg = f"🤖 <b>AI EARNINGS ANALYSIS - TOP 5</b> 🤖\n"
+        msg += f"📅 {current_time.strftime('%b %d at %H:%M UK')}\n"
+        msg += f"⏰ <b>ENTRY: 2:30 PM UK (Market Open)</b>\n"
+        msg += f"🎯 <b>TARGET: 3-5% | STOP: 2%</b>\n\n"
         
-        channel_msg = f"🚨 <b>TOP 5 EARNINGS PLAYS</b> 🚨\n"
-        channel_msg += f"📅 {current_time.strftime('%b %d, %Y at %H:%M UK')}\n"
-        channel_msg += f"📊 Analyzed {total_earnings} stocks → Top 5 picks\n\n"
+        for i, opp in enumerate(top_5, 1):
+            market_cap_b = opp['market_cap'] / 1_000_000_000
+            msg += f"<b>#{i} {opp['symbol']}</b> (${market_cap_b:.1f}B)\n"
+            msg += f"💰 ${opp['price_from']:.2f} → ${opp['price_to']:.2f} ({opp['gap']:+.1f}%)\n"
+            msg += f"🤖 <b>{opp['signal']}</b> | AI Score: {opp['score']:.0f}/100\n"
+            msg += f"📊 Sentiment: {opp['sentiment']} | Direction: {opp['direction']}\n"
+            msg += f"📈 EPS: {opp['eps_info']}\n"
+            msg += f"💼 Revenue: {opp['revenue_info']}\n"
+            msg += f"🧠 AI: {opp['llm_reasoning'][:100]}...\n\n"
         
-        for i, opp in enumerate(top_opportunities, 1):
-            channel_msg += f"<b>#{i} {opp['symbol']}</b> ({opp['company_name']})\n"
-            channel_msg += f"📈 Gap: <b>{opp['gap']:+.1f}%</b> (${opp['price_from']:.2f} → ${opp['price_to']:.2f})\n"
-            
-            if opp['earnings_data']:
-                eps_surprise = opp['earnings_data'].get('eps_surprise', 0)
-                channel_msg += f"📊 EPS surprise: <b>${eps_surprise:+.2f}</b>\n"
-            
-            channel_msg += f"🎯 <b>{opp['signal']}</b>\n"
-            channel_msg += f"⭐ Score: {opp['score']}/200\n\n"
+        msg += "⚡ <b>EXECUTION:</b>\n"
+        msg += "• Enter at 2:30 PM UK sharp\n"
+        msg += "• Stop-loss: 2% | Target: 3-5%\n"
+        msg += "• Exit within 2-3 minutes\n\n"
+        msg += "🚀 AI-powered earnings plays!"
         
-        channel_msg += "🎯 <b>Top picks from major stocks!</b>\n"
-        channel_msg += "📝 Trade with proper risk management!"
+        print("🏆 TOP 5 AI-ANALYZED OPPORTUNITIES:")
+        for i, opp in enumerate(top_5, 1):
+            print(f"#{i} {opp['symbol']}: {opp['signal']} {opp['gap']:+.1f}% (Score: {opp['score']:.0f})")
+            print(f"    AI: {opp['sentiment']} sentiment, {opp['direction']} direction")
         
-        print("🏆 TOP 5 RECOMMENDATIONS:")
-        for i, opp in enumerate(top_opportunities, 1):
-            print(f"#{i} {opp['symbol']}: {opp['signal']} (Score: {opp['score']})")
-        
-        if send_telegram_message(channel_msg):
-            print("✅ Top 5 recommendations sent!")
+        if send_telegram_message(msg):
+            print("✅ AI analysis sent to Telegram!")
         else:
-            print("❌ Failed to send recommendations")
+            print("❌ Failed to send Telegram message")
     else:
-        msg = f"📭 No strong opportunities from {total_earnings} major earnings today"
-        print(msg)
+        msg = f"🤖 AI EARNINGS SCAN COMPLETE\n"
+        msg += f"📊 Analyzed {len(bmo_stocks)} BMO stocks\n"
+        msg += f"❌ No qualifying opportunities found\n"
+        msg += f"🎯 Criteria: >$1B cap, strong AI confidence\n"
+        msg += f"💤 Better luck tomorrow!"
+        
+        print("📭 No qualifying opportunities found")
         send_telegram_message(msg)
 
 def send_startup_message():
-    """Send startup notification"""
+    """Send bot startup notification"""
     uk_tz = pytz.timezone('Europe/London')
     current_time = datetime.now(uk_tz)
-    startup_msg = f"🤖 <b>SMART EARNINGS BOT ONLINE</b>\n"
-    startup_msg += f"📅 Started: {current_time.strftime('%A, %B %d at %H:%M UK')}\n"
-    startup_msg += f"🚀 Running 24/7 on Railway\n"
-    startup_msg += f"📊 Monitoring {len(MAJOR_STOCKS)} major stocks\n"
-    startup_msg += f"🏆 Smart ranking → TOP 5 recommendations only\n"
-    startup_msg += f"⏰ Daily scans at 2:15 PM UK\n\n"
-    startup_msg += f"✅ Ready to find the best opportunities!"
     
-    if send_telegram_message(startup_msg):
-        print("✅ Startup message sent!")
-    else:
-        print("❌ Failed to send startup message")
+    llm_provider = "OpenAI GPT-4" if OPENAI_API_KEY else "Claude" if CLAUDE_API_KEY else "None"
+    
+    msg = f"🤖 <b>AI EARNINGS BOT ONLINE</b> 🤖\n"
+    msg += f"📅 {current_time.strftime('%A, %B %d at %H:%M UK')}\n\n"
+    msg += f"🧠 <b>AI ANALYST:</b> {llm_provider}\n"
+    msg += f"📊 <b>STRATEGY:</b>\n"
+    msg += f"• AI analyzes earnings sentiment\n"
+    msg += f"• Combines with gap analysis\n"
+    msg += f"• Target: >$1B cap BMO stocks\n"
+    msg += f"• Entry: 2:30 PM UK\n"
+    msg += f"• Profit: 3-5% | Stop: 2%\n\n"
+    msg += f"⏰ Daily scans at 2:15 PM UK\n"
+    
+    if not OPENAI_API_KEY and not CLAUDE_API_KEY:
+        msg += f"⚠️ No AI API key configured!\n"
+    
+    msg += f"✅ Ready for AI-powered trading!"
+    
+    send_telegram_message(msg)
 
 if __name__ == "__main__":
-    print("🤖 SMART TOP 5 EARNINGS BOT")
-    print(f"📊 Monitoring {len(MAJOR_STOCKS)} major stocks (NYSE + NASDAQ)")
-    print("🏆 Intelligent opportunity scoring")
+    print("🤖 AI EARNINGS SCALPING BOT v3.0")
+    print("🧠 LLM-powered earnings analysis")
+    print("📊 Sentiment + Gap combination")
+    print("⚡ 2-3 minute scalping strategy")
     
     # Send startup notification
     send_startup_message()
     
-    # Schedule the daily scan
-    schedule.every().day.at("14:15").do(main_earnings_scan)
+    # Schedule daily scan at 2:15 PM UK
+    schedule.every().day.at("14:15").do(main_llm_earnings_scan)
     
-    print("📅 Scheduled for 2:15 PM UK time daily")
-    print("🔄 Running initial scan...")
+    print("📅 Scheduled for 2:15 PM UK daily")
+    print("🔄 Running initial test scan...")
     
-    # Run initial scan
-    main_earnings_scan()
+    # Run test scan immediately
+    main_llm_earnings_scan()
     
-    print("\n⏳ Bot waiting for next scheduled scan...")
-    print("🎯 Smart recommendations, running 24/7!")
+    print("\n⏳ AI bot running... waiting for next scan")
     
     # Keep the bot running
     while True:
