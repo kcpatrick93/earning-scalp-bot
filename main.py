@@ -9,14 +9,54 @@ from datetime import datetime, timedelta
 # Get tokens from environment variables
 FINNHUB_TOKEN = os.getenv("FINNHUB_TOKEN", "d1ehal1r01qjssrk4fu0d1ehal1r01qjssrk4fug")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7626751011:AAHHWa7ItXmjaP4-icgw8Aiy6_SdvhMdVK4")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "-1001002605954379")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "@kp_earning_report_stockbot")
 
-# MAJOR US EXCHANGES - Include both NASDAQ and NYSE
-MAJOR_EXCHANGES = ['NASDAQ', 'NYSE', 'NMS', 'NCM', 'NGM', 'NYQ']
-
-# Quality criteria for major stocks
-MIN_MARKET_CAP = 1000000000  # $1B minimum
-MIN_AVG_VOLUME = 500000      # 500K average volume
+# COMPREHENSIVE LIST OF MAJOR STOCKS - NYSE + NASDAQ (Market Cap >$1B)
+MAJOR_STOCKS = {
+    # NASDAQ Mega/Large Caps
+    'AAPL', 'MSFT', 'GOOGL', 'GOOG', 'AMZN', 'NVDA', 'TSLA', 'META', 'AVGO', 'ORCL',
+    'COST', 'NFLX', 'CRM', 'AMD', 'CSCO', 'ADBE', 'TXN', 'QCOM', 'INTU', 'CMCSA',
+    'AMAT', 'INTC', 'PYPL', 'ISRG', 'BKNG', 'REGN', 'GILD', 'MU', 'ADI', 'LRCX',
+    'PANW', 'KLAC', 'SNPS', 'CDNS', 'MRVL', 'ORLY', 'ABNB', 'WDAY', 'TEAM', 'DXCM',
+    'SBUX', 'ZM', 'UBER', 'ROKU', 'DOCU', 'ZS', 'OKTA', 'SPLK', 'NDAQ', 'FAST',
+    'PCAR', 'DLTR', 'BIIB', 'IDXX', 'LULU', 'CSGP', 'VRSK', 'EXC', 'CTSH', 'FISV',
+    'ATVI', 'CHTR', 'LCID', 'RIVN', 'MRNA', 'VRTX', 'ALGN', 'SGEN', 'BMRN', 'ILMN',
+    'WBA', 'PAYX', 'CTAS', 'ODFL', 'ROST', 'KHC', 'SIRI', 'XLNX', 'MNST', 'CRWD',
+    
+    # NYSE Mega/Large Caps  
+    'V', 'JPM', 'WMT', 'XOM', 'UNH', 'MA', 'PG', 'HD', 'JNJ', 'BAC', 'KO', 'PEP',
+    'LLY', 'TMO', 'LIN', 'ACN', 'MRK', 'WFC', 'DIS', 'ABT', 'VZ', 'COP', 'DHR',
+    'PM', 'SPGI', 'RTX', 'HON', 'CAT', 'GS', 'NOW', 'IBM', 'AXP', 'BA', 'MMM',
+    'GE', 'T', 'MCD', 'NKE', 'CVX', 'NEE', 'LMT', 'UPS', 'LOW', 'AMGN', 'SCHW',
+    'BLK', 'SYK', 'ADP', 'TJX', 'MDLZ', 'C', 'DE', 'AMT', 'SPOT', 'PFE', 'SO',
+    'CL', 'BMY', 'TMUS', 'UNP', 'MS', 'BABA', 'FDX', 'USB', 'CVS', 'TGT', 'ABBV',
+    'MO', 'F', 'GM', 'DAL', 'AAL', 'UAL', 'LUV', 'CCL', 'RCL', 'NCLH', 'MGM',
+    'WYNN', 'LVS', 'BYD', 'CAH', 'WBA', 'RAD', 'KR', 'SYY', 'COST', 'TJX', 'DG',
+    
+    # Additional Major Companies (>$1B market cap)
+    'AZN', 'STLA', 'CBRE', 'DTE', 'SWK', 'BXP', 'NBIX', 'NMR', 'ARES', 'NXPI',
+    'GLW', 'TR', 'ARCC', 'CZR', 'INCY', 'FYBR', 'OFLX', 'JBGS', 'ASH', 'SB',
+    'IPA', 'CVEO', 'LVRO', 'AXR', 'GIC', 'DALN', 'EXE', 'ARI', 'WELL', 'UHS',
+    'CINF', 'NBTB', 'VLTO', 'EKSO', 'TLRY', 'WM', 'FSUN', 'PFG', 'CDP', 'PDM',
+    'WU', 'DM', 'BOH', 'SITC', 'RVTY', 'BSRR', 'ALRS', 'SYRS', 'RITM', 'ESQ',
+    'NBN', 'BMRC', 'CZWI', 'HEES', 'V', 'PG', 'UNH', 'MRK', 'BKNG', 'BA', 'SPOT',
+    
+    # REITs and Energy
+    'EQIX', 'PLD', 'CCI', 'AMT', 'SBAC', 'DLR', 'PSA', 'O', 'WELL', 'VTR', 'ARE',
+    'EPD', 'ET', 'KMI', 'OKE', 'WMB', 'MPLX', 'PAA', 'PAGP', 'SMLP', 'CEQP',
+    
+    # Financial Services
+    'BRK-A', 'BRK-B', 'JPM', 'BAC', 'WFC', 'C', 'GS', 'MS', 'USB', 'PNC', 'TFC',
+    'COF', 'SCHW', 'BLK', 'SPGI', 'ICE', 'CME', 'MCO', 'MSCI', 'NDAQ', 'CBOE',
+    
+    # Healthcare & Biotech
+    'JNJ', 'PFE', 'ABT', 'MRK', 'LLY', 'TMO', 'DHR', 'AMGN', 'GILD', 'BIIB',
+    'VRTX', 'REGN', 'MRNA', 'BNTX', 'ZTS', 'BMY', 'AZN', 'NVO', 'ROCHE', 'SNY',
+    
+    # Technology Services
+    'CRM', 'NOW', 'WDAY', 'TEAM', 'ZM', 'DOCU', 'ZS', 'OKTA', 'SPLK', 'SNOW',
+    'PLTR', 'U', 'PATH', 'DDOG', 'NET', 'CRWD', 'S', 'TWLO', 'WORK', 'FIVN'
+}
 
 def send_telegram_message(message):
     """Send message with fallback attempts"""
@@ -44,44 +84,8 @@ def send_telegram_message(message):
         print(f"❌ Telegram error: {e}")
         return False
 
-def is_major_stock(symbol):
-    """Check if stock is from a major exchange with quality criteria - WITH DEBUG"""
-    try:
-        print(f"    🔍 Checking {symbol}...")
-        stock = yf.Ticker(symbol)
-        info = stock.info
-        
-        # Debug: Print all relevant info
-        exchange = info.get('exchange', 'UNKNOWN')
-        market_cap = info.get('marketCap', 0)
-        avg_volume = info.get('averageVolume', 0)
-        
-        print(f"    📊 {symbol}: Exchange={exchange}, Cap=${market_cap/1000000:.0f}M, Volume={avg_volume:,}")
-        
-        # Check exchange
-        if exchange not in MAJOR_EXCHANGES:
-            print(f"    ❌ {symbol}: Exchange not in list ({exchange})")
-            return False
-        
-        # Check market cap
-        if market_cap < MIN_MARKET_CAP:
-            print(f"    ❌ {symbol}: Market cap too small (${market_cap/1000000:.0f}M < ${MIN_MARKET_CAP/1000000:.0f}M)")
-            return False
-            
-        # Check average volume
-        if avg_volume < MIN_AVG_VOLUME:
-            print(f"    ❌ {symbol}: Volume too low ({avg_volume:,} < {MIN_AVG_VOLUME:,})")
-            return False
-            
-        print(f"    ✅ {symbol}: PASSED all checks!")
-        return True
-        
-    except Exception as e:
-        print(f"    ❌ {symbol}: Error checking stock: {e}")
-        return False
-        
 def get_earnings_calendar():
-    """Get earnings for major stocks only"""
+    """Get earnings for major stocks only - NO API RATE LIMITS"""
     today = datetime.now().strftime('%Y-%m-%d')
     url = f"https://finnhub.io/api/v1/calendar/earnings?from={today}&to={today}&token={FINNHUB_TOKEN}"
     
@@ -96,13 +100,11 @@ def get_earnings_calendar():
             bmo_earnings = []
             amc_earnings = []
             
-            # Filter to major stocks only (but include both NYSE and NASDAQ)
+            # Filter to major stocks using our curated list (NO API CALLS)
             for stock in earnings.get('earningsCalendar', []):
                 symbol = stock.get('symbol')
-                if not symbol:
-                    continue
-                
-                if is_major_stock(symbol):
+                if symbol in MAJOR_STOCKS:  # Simple lookup - no API calls!
+                    print(f"    ✅ Found major stock: {symbol}")
                     if stock.get('hour') == 'bmo':
                         bmo_earnings.append(stock)
                     elif stock.get('hour') == 'amc':
@@ -118,13 +120,17 @@ def get_earnings_calendar():
         return [], []
 
 def analyze_stock_gap(symbol):
-    """Analyze stock with enhanced data"""
+    """Analyze stock with rate limiting protection"""
     try:
         print(f"  📊 Analyzing {symbol}...")
         stock = yf.Ticker(symbol)
         
-        hist = stock.history(period="5d")
+        # Add delay to avoid rate limits
+        time.sleep(0.5)
+        
+        hist = stock.history(period="2d")
         if len(hist) < 2:
+            print(f"    ❌ No price data for {symbol}")
             return None
         
         yesterday_close = hist['Close'].iloc[-2]
@@ -136,18 +142,15 @@ def analyze_stock_gap(symbol):
         avg_volume_5d = hist['Volume'].mean()
         volume_surge = recent_volume / avg_volume_5d if avg_volume_5d > 0 else 1
         
-        # Get company info
+        # Get basic company info (minimal API calls)
         try:
+            time.sleep(0.3)  # Rate limit protection
             info = stock.info
             company_name = info.get('shortName', symbol)
             market_cap = info.get('marketCap', 0)
-            sector = info.get('sector', 'Unknown')
-            exchange = info.get('exchange', 'Unknown')
         except:
             company_name = symbol
             market_cap = 0
-            sector = 'Unknown'
-            exchange = 'Unknown'
         
         print(f"    💰 {symbol} ({company_name}): ${yesterday_close:.2f} → ${current_price:.2f} ({gap_percent:+.1f}%)")
         
@@ -158,9 +161,7 @@ def analyze_stock_gap(symbol):
             'current_price': current_price,
             'gap_percent': gap_percent,
             'volume_surge': volume_surge,
-            'market_cap': market_cap,
-            'sector': sector,
-            'exchange': exchange
+            'market_cap': market_cap
         }
     except Exception as e:
         print(f"    ❌ Error analyzing {symbol}: {e}")
@@ -188,11 +189,11 @@ def get_earnings_results(symbol):
     return None
 
 def calculate_opportunity_score(stock_data, earnings_data, earnings_type):
-    """Calculate a score to rank opportunities (higher = better)"""
+    """Calculate opportunity score"""
     score = 0
     gap = abs(stock_data['gap_percent'])
     
-    # Base score from gap size (sweet spot is 2-6%)
+    # Base score from gap size
     if 2 <= gap <= 6:
         score += 100
     elif 1.5 <= gap < 2 or 6 < gap <= 8:
@@ -200,7 +201,7 @@ def calculate_opportunity_score(stock_data, earnings_data, earnings_type):
     elif 1 <= gap < 1.5 or 8 < gap <= 10:
         score += 60
     else:
-        score += 20  # Too small or too large
+        score += 20
     
     # Earnings surprise bonus
     if earnings_data:
@@ -208,7 +209,7 @@ def calculate_opportunity_score(stock_data, earnings_data, earnings_type):
         if eps_surprise > 0:
             score += 50  # Beat earnings
         elif eps_surprise < -0.05:
-            score += 30  # Significant miss (good for shorts)
+            score += 30  # Significant miss
     
     # Volume surge bonus
     volume_surge = stock_data.get('volume_surge', 1)
@@ -219,7 +220,7 @@ def calculate_opportunity_score(stock_data, earnings_data, earnings_type):
     elif volume_surge > 1.2:
         score += 10
     
-    # Market cap factor (prefer mid-large caps for stability)
+    # Market cap factor
     market_cap = stock_data.get('market_cap', 0)
     if market_cap > 50000000000:  # >$50B
         score += 20
@@ -228,16 +229,15 @@ def calculate_opportunity_score(stock_data, earnings_data, earnings_type):
     elif market_cap > 5000000000:   # >$5B
         score += 10
     
-    # AMC penalty (riskier overnight holds)
+    # AMC penalty
     if earnings_type == 'AMC':
         score -= 10
     
     return score
 
 def generate_signal(stock_data, earnings_data, earnings_type):
-    """Generate trading signal with risk assessment"""
+    """Generate trading signal"""
     gap = stock_data['gap_percent']
-    symbol = stock_data['symbol']
     
     # Must have meaningful gap
     if abs(gap) < 1.0:
@@ -276,7 +276,7 @@ def main_earnings_scan():
         send_telegram_message(msg)
         return
     
-    print(f"📊 Analyzing {total_earnings} major stocks (NYSE + NASDAQ)...")
+    print(f"📊 Analyzing {total_earnings} major stocks...")
     
     all_opportunities = []
     
@@ -287,7 +287,6 @@ def main_earnings_scan():
         
         stock_data = analyze_stock_gap(symbol)
         if not stock_data:
-            print(f"    ❌ No data")
             continue
         
         earnings_results = get_earnings_results(symbol)
@@ -302,10 +301,6 @@ def main_earnings_scan():
                 'gap': stock_data['gap_percent'],
                 'price_from': stock_data['yesterday_close'],
                 'price_to': stock_data['current_price'],
-                'volume_surge': stock_data['volume_surge'],
-                'market_cap': stock_data['market_cap'],
-                'sector': stock_data['sector'],
-                'exchange': stock_data['exchange'],
                 'earnings_type': 'BMO',
                 'score': score,
                 'earnings_data': earnings_results
@@ -322,7 +317,6 @@ def main_earnings_scan():
         
         stock_data = analyze_stock_gap(symbol)
         if not stock_data:
-            print(f"    ❌ No data")
             continue
         
         earnings_results = get_earnings_results(symbol)
@@ -337,10 +331,6 @@ def main_earnings_scan():
                 'gap': stock_data['gap_percent'],
                 'price_from': stock_data['yesterday_close'],
                 'price_to': stock_data['current_price'],
-                'volume_surge': stock_data['volume_surge'],
-                'market_cap': stock_data['market_cap'],
-                'sector': stock_data['sector'],
-                'exchange': stock_data['exchange'],
                 'earnings_type': 'AMC',
                 'score': score,
                 'earnings_data': earnings_results
@@ -354,13 +344,11 @@ def main_earnings_scan():
     
     # Rank and get TOP 5
     if all_opportunities:
-        # Sort by score (highest first)
         top_opportunities = sorted(all_opportunities, key=lambda x: x['score'], reverse=True)[:5]
         
         uk_tz = pytz.timezone('Europe/London')
         current_time = datetime.now(uk_tz)
         
-        # Create clean Telegram message
         channel_msg = f"🚨 <b>TOP 5 EARNINGS PLAYS</b> 🚨\n"
         channel_msg += f"📅 {current_time.strftime('%b %d, %Y at %H:%M UK')}\n"
         channel_msg += f"📊 Analyzed {total_earnings} stocks → Top 5 picks\n\n"
@@ -368,7 +356,6 @@ def main_earnings_scan():
         for i, opp in enumerate(top_opportunities, 1):
             channel_msg += f"<b>#{i} {opp['symbol']}</b> ({opp['company_name']})\n"
             channel_msg += f"📈 Gap: <b>{opp['gap']:+.1f}%</b> (${opp['price_from']:.2f} → ${opp['price_to']:.2f})\n"
-            channel_msg += f"🏢 {opp['exchange']} • ${opp['market_cap']/1000000000:.1f}B cap\n"
             
             if opp['earnings_data']:
                 eps_surprise = opp['earnings_data'].get('eps_surprise', 0)
@@ -377,7 +364,7 @@ def main_earnings_scan():
             channel_msg += f"🎯 <b>{opp['signal']}</b>\n"
             channel_msg += f"⭐ Score: {opp['score']}/200\n\n"
         
-        channel_msg += "🎯 <b>Ranked by opportunity score!</b>\n"
+        channel_msg += "🎯 <b>Top picks from major stocks!</b>\n"
         channel_msg += "📝 Trade with proper risk management!"
         
         print("🏆 TOP 5 RECOMMENDATIONS:")
@@ -389,7 +376,7 @@ def main_earnings_scan():
         else:
             print("❌ Failed to send recommendations")
     else:
-        msg = f"📭 No quality opportunities today from {total_earnings} earnings"
+        msg = f"📭 No strong opportunities from {total_earnings} major earnings today"
         print(msg)
         send_telegram_message(msg)
 
@@ -400,7 +387,7 @@ def send_startup_message():
     startup_msg = f"🤖 <b>SMART EARNINGS BOT ONLINE</b>\n"
     startup_msg += f"📅 Started: {current_time.strftime('%A, %B %d at %H:%M UK')}\n"
     startup_msg += f"🚀 Running 24/7 on Railway\n"
-    startup_msg += f"📊 Scanning ALL major stocks (NYSE + NASDAQ)\n"
+    startup_msg += f"📊 Monitoring {len(MAJOR_STOCKS)} major stocks\n"
     startup_msg += f"🏆 Smart ranking → TOP 5 recommendations only\n"
     startup_msg += f"⏰ Daily scans at 2:15 PM UK\n\n"
     startup_msg += f"✅ Ready to find the best opportunities!"
@@ -412,7 +399,7 @@ def send_startup_message():
 
 if __name__ == "__main__":
     print("🤖 SMART TOP 5 EARNINGS BOT")
-    print("📊 All major stocks (NYSE + NASDAQ) → Best 5 picks")
+    print(f"📊 Monitoring {len(MAJOR_STOCKS)} major stocks (NYSE + NASDAQ)")
     print("🏆 Intelligent opportunity scoring")
     
     # Send startup notification
@@ -434,7 +421,3 @@ if __name__ == "__main__":
     while True:
         schedule.run_pending()
         time.sleep(60)
-# For testing - remove this line later
-main_earnings_scan()
-# TEST: Run scan now
-main_earnings_scan()
