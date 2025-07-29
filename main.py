@@ -426,3 +426,5 @@ if __name__ == "__main__":
         time.sleep(60)
 # For testing - remove this line later
 main_earnings_scan()
+# TEST: Run scan now
+main_earnings_scan()
