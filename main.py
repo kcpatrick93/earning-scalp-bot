@@ -45,31 +45,41 @@ def send_telegram_message(message):
         return False
 
 def is_major_stock(symbol):
-    """Check if stock is from a major exchange with quality criteria"""
+    """Check if stock is from a major exchange with quality criteria - WITH DEBUG"""
     try:
+        print(f"    🔍 Checking {symbol}...")
         stock = yf.Ticker(symbol)
         info = stock.info
         
+        # Debug: Print all relevant info
+        exchange = info.get('exchange', 'UNKNOWN')
+        market_cap = info.get('marketCap', 0)
+        avg_volume = info.get('averageVolume', 0)
+        
+        print(f"    📊 {symbol}: Exchange={exchange}, Cap=${market_cap/1000000:.0f}M, Volume={avg_volume:,}")
+        
         # Check exchange
-        exchange = info.get('exchange', '')
         if exchange not in MAJOR_EXCHANGES:
+            print(f"    ❌ {symbol}: Exchange not in list ({exchange})")
             return False
         
         # Check market cap
-        market_cap = info.get('marketCap', 0)
         if market_cap < MIN_MARKET_CAP:
+            print(f"    ❌ {symbol}: Market cap too small (${market_cap/1000000:.0f}M < ${MIN_MARKET_CAP/1000000:.0f}M)")
             return False
             
         # Check average volume
-        avg_volume = info.get('averageVolume', 0)
         if avg_volume < MIN_AVG_VOLUME:
+            print(f"    ❌ {symbol}: Volume too low ({avg_volume:,} < {MIN_AVG_VOLUME:,})")
             return False
             
+        print(f"    ✅ {symbol}: PASSED all checks!")
         return True
         
     except Exception as e:
+        print(f"    ❌ {symbol}: Error checking stock: {e}")
         return False
-
+        
 def get_earnings_calendar():
     """Get earnings for major stocks only"""
     today = datetime.now().strftime('%Y-%m-%d')
