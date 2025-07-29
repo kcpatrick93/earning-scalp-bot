@@ -16,7 +16,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Set OpenAI key if available
 if OPENAI_API_KEY:
-    openai.api_key = 
+    openai.api_key = OPENAI_API_KEY OPENAI_API_KEY
     
 def send_telegram_message(message):
     """Send message to Telegram"""
