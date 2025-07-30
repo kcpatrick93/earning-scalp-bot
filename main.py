@@ -133,18 +133,25 @@ def run_full_backtest():
         
         # Get LLM analysis
         llm_analysis = analyze_earnings_with_llm(symbol)
+        print(f"📝 Raw LLM response for {symbol}: {llm_analysis}")
+        
         if not llm_analysis:
+            print(f"❌ {symbol}: No LLM analysis")
             continue
             
         parsed = parse_llm_analysis(llm_analysis)
+        print(f"📊 Parsed data for {symbol}: {parsed}")
+        
         if not parsed:
+            print(f"❌ {symbol}: Failed to parse")
             continue
         
-        # Calculate score
+        # Extract data (with fallbacks)
         gap = market_data['gap_percent']
-        sentiment = parsed.get('sentiment', 'NEUTRAL')
-        direction = parsed.get('direction', 'UP')
-        confidence = parsed.get('confidence', 5)
+        sentiment = parsed.get('sentiment', 'NEUTRAL') if parsed else 'NEUTRAL'
+        direction = parsed.get('direction', 'UP' if gap > 0 else 'DOWN') if parsed else ('UP' if gap > 0 else 'DOWN')
+        confidence = parsed.get('confidence', 5) if parsed else 5
+        reasoning = parsed.get('reasoning', 'Analysis failed - using gap logic') if parsed else 'Analysis failed - using gap logic'
         
         base_score = confidence * 10
         
@@ -157,13 +164,19 @@ def run_full_backtest():
         
         final_score = max(0, min(100, base_score))
         
-        # Generate signal
-        if sentiment == "POSITIVE" and direction == "UP":
+        # Generate signal (simplified logic)
+        if sentiment == "POSITIVE":
             signal = "🚀 STRONG BUY" if gap > 1 else "🟢 BUY"
-        elif sentiment == "NEGATIVE" and direction == "DOWN":
+        elif sentiment == "NEGATIVE":
             signal = "📉 STRONG SHORT" if gap < -1 else "🔴 SHORT"
         else:
-            signal = "🟡 MIXED"
+            # Default logic based on gap
+            if gap > 1:
+                signal = "🟢 BUY"
+            elif gap < -1:
+                signal = "🔴 SHORT"
+            else:
+                signal = "🟡 NEUTRAL"
         
         opportunities.append({
             'symbol': symbol,
@@ -176,7 +189,7 @@ def run_full_backtest():
             'confidence': confidence,
             'score': final_score,
             'market_cap': market_data['market_cap'],
-            'reasoning': parsed.get('reasoning', 'No reasoning')
+            'reasoning': reasoning
         })
         
         print(f"✅ {symbol}: {signal} (Score: {final_score})")
