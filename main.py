@@ -31,7 +31,7 @@ def send_telegram_message(message):
 
 
 def scrape_real_earnings_data():
-    """Scrape today's before-market Nasdaq earnings"""
+    """Scrape today's before-market Nasdaq earnings via API date filter"""
     today = datetime.utcnow().date()
     today_str = today.strftime("%Y-%m-%d")
     headers = {
@@ -42,25 +42,23 @@ def scrape_real_earnings_data():
         'Origin': 'https://www.nasdaq.com'
     }
     earnings_stocks = []
-    # NASDAQ API endpoints
-    for endpoint in [
-        "https://api.nasdaq.com/api/calendar/earnings",
-        "https://www.nasdaq.com/api/calendar/earnings"
-    ]:
+    # Query NASDAQ API with date param
+    for base in ["https://api.nasdaq.com/api/calendar/earnings", "https://www.nasdaq.com/api/calendar/earnings"]:
         try:
-            r = requests.get(endpoint, headers=headers, timeout=15)
+            url = f"{base}?date={today_str}"
+            r = requests.get(url, headers=headers, timeout=15)
             r.raise_for_status()
-            data = r.json().get('data', {})
-            calendar = data.get('earnings', []) or data.get('rows', [])
-            for item in calendar:
-                # ensure item has reportDate and time fields
+            root = r.json().get('data', {})
+            rows = root.get('rows') or root.get('earnings') or []
+            for item in rows:
                 report_date = item.get('reportDate') or item.get('date')
-                when = item.get('time', '').lower()
-                if report_date == today_str and 'am' in when:
+                when = (item.get('time') or '').lower()
+                # Filter for before-market times (e.g. "am")
+                if report_date == today_str and ('am' in when or 'before market open' in when.lower()):
                     sym = item.get('symbol') or item.get('ticker')
                     if sym and sym.isalpha() and len(sym) <= 5:
                         earnings_stocks.append({'symbol': sym.upper(), 'source': 'NASDAQ_API'})
-        except:
+        except Exception:
             continue
         if earnings_stocks:
             break
