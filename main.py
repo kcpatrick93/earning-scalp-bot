@@ -31,7 +31,9 @@ def send_telegram_message(message):
 
 
 def scrape_real_earnings_data():
-    """Scrape real earnings data using NASDAQ API (plus Yahoo backup)"""
+    """Scrape today's before-market Nasdaq earnings"""
+    today = datetime.utcnow().date()
+    today_str = today.strftime("%Y-%m-%d")
     headers = {
         'User-Agent': 'Mozilla/5.0',
         'Accept': 'application/json, text/plain, */*',
@@ -47,32 +49,24 @@ def scrape_real_earnings_data():
     ]:
         try:
             r = requests.get(endpoint, headers=headers, timeout=15)
-            if r.status_code == 200:
-                data = r.json()
-                for val in data.values():
-                    if isinstance(val, list):
-                        for item in val[:50]:
-                            if isinstance(item, dict):
-                                sym = next((item.get(k) for k in ['symbol','ticker','Symbol','Ticker'] if item.get(k)), None)
-                                if sym and sym.isalpha() and len(sym)<=5:
-                                    earnings_stocks.append({'symbol': sym.upper(), 'source': 'NASDAQ_API'})
-                break
+            r.raise_for_status()
+            data = r.json().get('data', {})
+            calendar = data.get('earnings', []) or data.get('rows', [])
+            for item in calendar:
+                # ensure item has reportDate and time fields
+                report_date = item.get('reportDate') or item.get('date')
+                when = item.get('time', '').lower()
+                if report_date == today_str and 'am' in when:
+                    sym = item.get('symbol') or item.get('ticker')
+                    if sym and sym.isalpha() and len(sym) <= 5:
+                        earnings_stocks.append({'symbol': sym.upper(), 'source': 'NASDAQ_API'})
         except:
             continue
-    # Yahoo Finance fallback
-    if len(earnings_stocks) < 5:
-        try:
-            r = requests.get("https://finance.yahoo.com/calendar/earnings", headers={'User-Agent': 'Mozilla/5.0'}, timeout=15)
-            if r.status_code == 200:
-                syms = re.findall(r'"symbol":"([A-Z]{1,5})"', r.text)
-                for sym in syms[:20]:
-                    if sym not in [s['symbol'] for s in earnings_stocks]:
-                        earnings_stocks.append({'symbol': sym, 'source': 'YAHOO_FINANCE'})
-        except:
-            pass
-    # Dedupe
+        if earnings_stocks:
+            break
+    # Remove duplicates
     unique = {s['symbol']: s for s in earnings_stocks}
-    print(f"🔍 Found {len(unique)} earnings symbols")
+    print(f"🔍 Today's before-market earnings: {len(unique)} symbols")
     return list(unique.values())
 
 
