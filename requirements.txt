@@ -5,3 +5,4 @@ beautifulsoup4==4.12.2
 yfinance==0.2.18
 openai==0.28.1
 lxml==4.9.3
+apscheduler==3.10.1
