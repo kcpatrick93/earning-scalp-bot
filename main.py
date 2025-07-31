@@ -253,4 +253,7 @@ if __name__ == "__main__":
     trigger = CronTrigger(day_of_week='mon-fri', hour=14, minute=10)
     scheduler.add_job(scheduled_job, trigger, id="earnings_analysis")
     print("🔧 Scheduler started – runs Mon–Fri at 14:10 London time")
+    # **FOR TESTING ONLY** — run once on startup:
+scheduled_job()
+
     scheduler.start()
